@@ -34,19 +34,21 @@ jobs:
         run: |
           rm -f packages/*
           cp control.template control
-          if [[ ${{matrix.provider}} == TFP0 ]]; then
+          PROVIDER="${{ matrix.provider }}"
+          if [[ "$PROVIDER" == "TFP0" ]]; then
             USE_TFP0=1 make package FINALPACKAGE=1
-          elif [[ ${{matrix.provider}} == LIBKRW ]]; then
+          elif [[ "$PROVIDER" == "LIBKRW" ]]; then
             sed -i '' 's/{{.depends}}/libkrw/g' control
             USE_LIBKRW=1 make package FINALPACKAGE=1
-          elif [[ ${{matrix.provider}} == LIBKERNRW ]]; then
+          elif [[ "$PROVIDER" == "LIBKERNRW" ]]; then
             sed -i '' 's/{{.depends}}/libkernrw0/g' control
             USE_LIBKERNRW=1 make package FINALPACKAGE=1
+          fi
 
       - name: Publish artifact
         uses: actions/upload-artifact@v4
         with:
-          name: fouldecrypt-${{matrix.provider}}
+          name: fouldecrypt-${{ matrix.provider }}
           path: ${{ github.workspace }}/packages/*.deb
 
       - name: Release
