@@ -1,50 +1,44 @@
 name: Build Fouldecrypt
 
+# Trigger the workflow manually or on push to main
 on:
+  workflow_dispatch:    # Manual run button
   push:
     branches:
       - main
-  pull_request:
 
 jobs:
   build:
     runs-on: macos-latest
 
     env:
-      THEOS: ${{ github.workspace }}/theos
+      THEOS: /Users/runner/work/fouldecrypt/fouldecrypt/theos
       SDKROOT: /Applications/Xcode_16.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk
       CC: clang
       CXX: clang++
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    - name: Install Homebrew packages
-      run: |
-        brew install make ldid dpkg
-        echo 'export PATH="/opt/homebrew/opt/make/libexec/gnubin:$PATH"' >> $GITHUB_ENV
+      - name: Install dependencies
+        run: |
+          brew install make ldid dpkg
 
-    - name: Set Xcode version
-      run: sudo xcode-select -s /Applications/Xcode_16.app
+      - name: Build packages
+        shell: bash
+        run: |
+          rm -f packages/*
+          cp control.template control
 
-    - name: Build Fouldecrypt
-      run: |
-        rm -f packages/*
-        cp control.template control
-        PROVIDER="TFP0"
-        if [[ "$PROVIDER" == "TFP0" ]]; then
-          USE_TFP0=1 gmake -j$(sysctl -n hw.ncpu) package FINALPACKAGE=1
-        elif [[ "$PROVIDER" == "LIBKRW" ]]; then
-          sed -i '' 's/{{.depends}}/libkrw/g' control
-          USE_LIBKRW=1 gmake -j$(sysctl -n hw.ncpu) package FINALPACKAGE=1
-        elif [[ "$PROVIDER" == "LIBKERNRW" ]]; then
-          sed -i '' 's/{{.depends}}/libkernrw0/g' control
-          USE_LIBKERNRW=1 gmake -j$(sysctl -n hw.ncpu) package FINALPACKAGE=1
-        fi
+          PROVIDER="TFP0"
 
-    - name: Upload packages
-      uses: actions/upload-artifact@v4
-      with:
-        name: fouldecrypt-packages
-        path: packages/
+          if [[ "$PROVIDER" == "TFP0" ]]; then
+            USE_TFP0=1 make -j$(sysctl -n hw.ncpu) package FINALPACKAGE=1
+          elif [[ "$PROVIDER" == "LIBKRW" ]]; then
+            sed -i '' 's/{{.depends}}/libkrw/g' control
+            USE_LIBKRW=1 make -j$(sysctl -n hw.ncpu) package FINALPACKAGE=1
+          elif [[ "$PROVIDER" == "LIBKERNRW" ]]; then
+            sed -i '' 's/{{.depends}}/libkernrw0/g' control
+            USE_LIBKERNRW=1 make -j$(sysctl -n hw.ncpu) package FINALPACKAGE=1
+          fi
