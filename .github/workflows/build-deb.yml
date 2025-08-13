@@ -12,8 +12,7 @@ jobs:
         provider: [TFP0, LIBKRW, LIBKERNRW]
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: recursive
 
@@ -22,13 +21,14 @@ jobs:
           sudo xcode-select --install || true
           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
-      - name: Set C++ compiler
-        run: |
-          export CC=clang
-          export CXX=clang++
-
       - name: Prepare Theos
         uses: Randomblock1/theos-action@v1
+
+      - name: Set environment variables for C/C++
+        run: |
+          echo "SDKROOT=$(xcrun --sdk macosx --show-sdk-path)" >> $GITHUB_ENV
+          echo "CC=clang" >> $GITHUB_ENV
+          echo "CXX=clang++" >> $GITHUB_ENV
 
       - name: Build package
         run: |
@@ -36,14 +36,19 @@ jobs:
           cp control.template control
           PROVIDER="${{ matrix.provider }}"
           if [[ "$PROVIDER" == "TFP0" ]]; then
-            USE_TFP0=1 make package FINALPACKAGE=1
+            USE_TFP0=1 make -j$(sysctl -n hw.ncpu) package FINALPACKAGE=1
           elif [[ "$PROVIDER" == "LIBKRW" ]]; then
             sed -i '' 's/{{.depends}}/libkrw/g' control
-            USE_LIBKRW=1 make package FINALPACKAGE=1
+            USE_LIBKRW=1 make -j$(sysctl -n hw.ncpu) package FINALPACKAGE=1
           elif [[ "$PROVIDER" == "LIBKERNRW" ]]; then
             sed -i '' 's/{{.depends}}/libkernrw0/g' control
-            USE_LIBKERNRW=1 make package FINALPACKAGE=1
+            USE_LIBKERNRW=1 make -j$(sysctl -n hw.ncpu) package FINALPACKAGE=1
           fi
+        env:
+          THEOS: ${{ github.workspace }}/theos
+          SDKROOT: ${{ env.SDKROOT }}
+          CC: ${{ env.CC }}
+          CXX: ${{ env.CXX }}
 
       - name: Publish artifact
         uses: actions/upload-artifact@v4
@@ -52,8 +57,8 @@ jobs:
           path: ${{ github.workspace }}/packages/*.deb
 
       - name: Release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           files: ${{ github.workspace }}/packages/*.deb
         env:
