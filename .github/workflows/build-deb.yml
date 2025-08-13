@@ -35,7 +35,7 @@ jobs:
           fi
 
       - name: Publish artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: fouldecrypt-${{matrix.provider}}
           path: ${{ github.workspace }}/packages/*.deb
