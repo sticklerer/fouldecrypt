@@ -16,39 +16,33 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install Xcode CLI tools
-        run: |
-          sudo xcode-select --install || true
-          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-
       - name: Prepare Theos
         uses: Randomblock1/theos-action@v1
 
       - name: Set environment variables for C/C++
         run: |
-          echo "SDKROOT=$(xcrun --sdk macosx --show-sdk-path)" >> $GITHUB_ENV
+          echo "SDKROOT=$(xcrun --sdk iphoneos --show-sdk-path)" >> $GITHUB_ENV
           echo "CC=clang" >> $GITHUB_ENV
           echo "CXX=clang++" >> $GITHUB_ENV
+          echo "CXXFLAGS=-std=c++17 -stdlib=libc++" >> $GITHUB_ENV
 
       - name: Build package
         run: |
           rm -f packages/*
           cp control.template control
-          PROVIDER="${{ matrix.provider }}"
-          if [[ "$PROVIDER" == "TFP0" ]]; then
-            USE_TFP0=1 make -j$(sysctl -n hw.ncpu) package FINALPACKAGE=1
-          elif [[ "$PROVIDER" == "LIBKRW" ]]; then
+
+          if [[ "${{ matrix.provider }}" == "TFP0" ]]; then
+            USE_TFP0=1 make -j$(sysctl -n hw.ncpu) package FINALPACKAGE=1 CXXFLAGS="$CXXFLAGS"
+          elif [[ "${{ matrix.provider }}" == "LIBKRW" ]]; then
             sed -i '' 's/{{.depends}}/libkrw/g' control
-            USE_LIBKRW=1 make -j$(sysctl -n hw.ncpu) package FINALPACKAGE=1
-          elif [[ "$PROVIDER" == "LIBKERNRW" ]]; then
+            USE_LIBKRW=1 make -j$(sysctl -n hw.ncpu) package FINALPACKAGE=1 CXXFLAGS="$CXXFLAGS"
+          elif [[ "${{ matrix.provider }}" == "LIBKERNRW" ]]; then
             sed -i '' 's/{{.depends}}/libkernrw0/g' control
-            USE_LIBKERNRW=1 make -j$(sysctl -n hw.ncpu) package FINALPACKAGE=1
+            USE_LIBKERNRW=1 make -j$(sysctl -n hw.ncpu) package FINALPACKAGE=1 CXXFLAGS="$CXXFLAGS"
           fi
+        shell: /bin/bash -e {0}
         env:
           THEOS: ${{ github.workspace }}/theos
-          SDKROOT: ${{ env.SDKROOT }}
-          CC: ${{ env.CC }}
-          CXX: ${{ env.CXX }}
 
       - name: Publish artifact
         uses: actions/upload-artifact@v4
