@@ -1,48 +1,69 @@
-name: Build Theos Project
+name: Build Fouldecrypt
 
 on:
-  workflow_dispatch:   # manual trigger
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: macos-latest
 
     steps:
-      # 1. Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 2. Install dependencies
-      - name: Install Homebrew dependencies
+      - name: Set up Homebrew
         run: |
-          brew install make ldid dpkg gpatch libmd
+          echo "::group::Homebrew Setup"
+          if ! command -v brew &> /dev/null; then
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          fi
+          echo "::endgroup::"
 
-      # 3. Set up Theos
-      - name: Set up Theos
+      - name: Install dependencies
         run: |
-          export THEOS=$HOME/theos
-          git clone --depth=1 https://github.com/theos/theos.git $THEOS
+          echo "::group::Installing Dependencies"
+          brew install make gpatch libmd ldid dpkg || true
+          echo "Adding GNU make to PATH..."
+          echo "/opt/homebrew/opt/make/libexec/gnubin" >> $GITHUB_PATH
+          echo "::endgroup::"
+
+      - name: Setup Xcode command line tools
+        run: |
+          echo "::group::Xcode CLI Tools"
+          sudo xcode-select --install || true
+          sudo xcode-select -s /Applications/Xcode_16.app/Contents/Developer
+          echo "::endgroup::"
+
+      - name: Set THEOS environment
+        run: |
+          echo "::group::Set THEOS Environment"
+          export THEOS="$GITHUB_WORKSPACE/theos"
           echo "THEOS=$THEOS" >> $GITHUB_ENV
+          echo "::endgroup::"
 
-      # 4. Make sure GNU make is used
-      - name: Use gmake if needed
+      - name: Build packages
         run: |
-          echo 'export PATH="/opt/homebrew/opt/make/libexec/gnubin:$PATH"' >> $GITHUB_ENV
+          echo "::group::Build Fouldecrypt Packages"
+          rm -f packages/*
+          cp control.template control
 
-      # 5. Build the project
-      - name: Build with Theos
-        run: |
-          export THEOS=$THEOS
-          make clean
-          make
+          PROVIDER="TFP0"
+          if [[ "$PROVIDER" == "TFP0" ]]; then
+            USE_TFP0=1 gmake -j$(sysctl -n hw.ncpu) package FINALPACKAGE=1
+          elif [[ "$PROVIDER" == "LIBKRW" ]]; then
+            sed -i '' 's/{{.depends}}/libkrw/g' control
+            USE_LIBKRW=1 gmake -j$(sysctl -n hw.ncpu) package FINALPACKAGE=1
+          elif [[ "$PROVIDER" == "LIBKERNRW" ]]; then
+            sed -i '' 's/{{.depends}}/libkernrw0/g' control
+            USE_LIBKERNRW=1 gmake -j$(sysctl -n hw.ncpu) package FINALPACKAGE=1
+          fi
+          echo "::endgroup::"
 
-      # 6. Optional: Archive build artifacts
-      - name: Archive .deb or build output
-        if: success()
+      - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: deb-package
-          path: ./packages/*.deb
+          name: fouldecrypt-packages
+          path: packages/*
