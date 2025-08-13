@@ -17,6 +17,16 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Install Xcode CLI tools
+        run: |
+          sudo xcode-select --install || true
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Set C++ compiler
+        run: |
+          export CC=clang
+          export CXX=clang++
+
       - name: Prepare Theos
         uses: Randomblock1/theos-action@v1
 
@@ -32,7 +42,6 @@ jobs:
           elif [[ ${{matrix.provider}} == LIBKERNRW ]]; then
             sed -i '' 's/{{.depends}}/libkernrw0/g' control
             USE_LIBKERNRW=1 make package FINALPACKAGE=1
-          fi
 
       - name: Publish artifact
         uses: actions/upload-artifact@v4
