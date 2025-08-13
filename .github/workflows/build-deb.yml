@@ -2,10 +2,7 @@ name: C/C++ CI
 
 on:
   push:
-    #tags:
-    #  - 'v*'
-
-    #branches: [ master ]
+    branches: [ master ]
 
 jobs:
   build:
