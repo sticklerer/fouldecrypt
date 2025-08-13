@@ -1,8 +1,7 @@
-name: Build Fouldecrypt
+name: Build Theos Project
 
-# Trigger the workflow manually or on push to main
 on:
-  workflow_dispatch:    # Manual run button
+  workflow_dispatch:   # manual trigger
   push:
     branches:
       - main
@@ -11,34 +10,39 @@ jobs:
   build:
     runs-on: macos-latest
 
-    env:
-      THEOS: /Users/runner/work/fouldecrypt/fouldecrypt/theos
-      SDKROOT: /Applications/Xcode_16.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk
-      CC: clang
-      CXX: clang++
-
     steps:
+      # 1. Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Install dependencies
+      # 2. Install dependencies
+      - name: Install Homebrew dependencies
         run: |
-          brew install make ldid dpkg
+          brew install make ldid dpkg gpatch libmd
 
-      - name: Build packages
-        shell: bash
+      # 3. Set up Theos
+      - name: Set up Theos
         run: |
-          rm -f packages/*
-          cp control.template control
+          export THEOS=$HOME/theos
+          git clone --depth=1 https://github.com/theos/theos.git $THEOS
+          echo "THEOS=$THEOS" >> $GITHUB_ENV
 
-          PROVIDER="TFP0"
+      # 4. Make sure GNU make is used
+      - name: Use gmake if needed
+        run: |
+          echo 'export PATH="/opt/homebrew/opt/make/libexec/gnubin:$PATH"' >> $GITHUB_ENV
 
-          if [[ "$PROVIDER" == "TFP0" ]]; then
-            USE_TFP0=1 make -j$(sysctl -n hw.ncpu) package FINALPACKAGE=1
-          elif [[ "$PROVIDER" == "LIBKRW" ]]; then
-            sed -i '' 's/{{.depends}}/libkrw/g' control
-            USE_LIBKRW=1 make -j$(sysctl -n hw.ncpu) package FINALPACKAGE=1
-          elif [[ "$PROVIDER" == "LIBKERNRW" ]]; then
-            sed -i '' 's/{{.depends}}/libkernrw0/g' control
-            USE_LIBKERNRW=1 make -j$(sysctl -n hw.ncpu) package FINALPACKAGE=1
-          fi
+      # 5. Build the project
+      - name: Build with Theos
+        run: |
+          export THEOS=$THEOS
+          make clean
+          make
+
+      # 6. Optional: Archive build artifacts
+      - name: Archive .deb or build output
+        if: success()
+        uses: actions/upload-artifact@v3
+        with:
+          name: deb-package
+          path: ./packages/*.deb
