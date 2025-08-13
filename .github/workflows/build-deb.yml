@@ -1,44 +1,38 @@
-name: Build fouldecrypt
+name: Build Fouldecrypt
 
 on:
   push:
+    branches:
+      - main
   pull_request:
 
 jobs:
   build:
     runs-on: macos-latest
 
-    strategy:
-      matrix:
-        provider: [TFP0, LIBKRW, LIBKERNRW]
+    env:
+      THEOS: ${{ github.workspace }}/theos
+      SDKROOT: /Applications/Xcode_16.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk
+      CC: clang
+      CXX: clang++
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v3
 
     - name: Install dependencies
       run: |
-        brew install make
-        brew install ldid
-        brew install dpkg
-        brew install theos
+        brew install make ldid dpkg
+        # Add GNU make to PATH
+        export PATH="/opt/homebrew/opt/make/libexec/gnubin:$PATH"
+        # Clone Theos
+        git clone --depth=1 https://github.com/theos/theos.git $THEOS
 
-    - name: Build package
-      shell: bash
+    - name: Build fouldecrypt
       run: |
         rm -f packages/*
         cp control.template control
-
-        PROVIDER="${{ matrix.provider }}"
-
-        # Theos / SDK / compiler setup
-        export THEOS=$GITHUB_WORKSPACE/theos
-        export SDKROOT=$(xcrun --sdk iphoneos --show-sdk-path)
-        export CC=clang
-        export CXX=clang++
-        export CPLUS_INCLUDE_PATH=$(xcrun --show-sdk-path)/usr/include/c++/v1
-        export TARGET_IOS=13.0
-        export TARGET_ARCH=arm64e
+        PROVIDER="TFP0"
 
         if [[ "$PROVIDER" == "TFP0" ]]; then
           USE_TFP0=1 make -j$(sysctl -n hw.ncpu) package FINALPACKAGE=1
@@ -49,9 +43,4 @@ jobs:
           sed -i '' 's/{{.depends}}/libkernrw0/g' control
           USE_LIBKERNRW=1 make -j$(sysctl -n hw.ncpu) package FINALPACKAGE=1
         fi
-
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: packages
-        path: packages/*.deb
+      shell: bash
